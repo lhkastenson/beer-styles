@@ -1,0 +1,7 @@
+[package]
+name = "beer-styles"
+version = "0.1.1"
+authors = ["Lon Kastenson <lhkastenson@gmail.com>"]
+
+[dependencies]
+rusted_cypher = { version = "*"}
