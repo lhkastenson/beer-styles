@@ -10,6 +10,7 @@ pub struct Style {
     abv_high: f64,
     ibu_low: i32,
     ibu_high: i32,
+
     srm_low: f64,
     srm_high: f64,
     original_gravity_low: f64,
@@ -63,6 +64,7 @@ impl Style {
         &self.ibu_high
     }
 
+
     fn get_srm_low(&self) -> &f64 {
         &self.srm_low
     }
@@ -104,6 +106,7 @@ impl PartialEq for Style {
     }
 }
 impl Eq for Style {}
+
 
 pub fn get_graph_connection() -> GraphClient{
     let neo4j_username = &env::var("NEO4JUSERNAME").unwrap();
@@ -168,6 +171,7 @@ pub fn get_beer_style(style_name: &String) -> Style {
         final_gravity_low = row.get("s.finalGravityLow").unwrap();
         final_gravity_high = row.get("s.finalGravityHigh").unwrap();
     }
+
     Style::new(name,
                abv_low,
                abv_high,
@@ -186,12 +190,14 @@ mod tests {
     use super::*;
 
     #[test]
+
     fn get_beer_successful_test() {
         let name = String::from("Belgian Dubbel");
         let abv_low = 6.0;
         let abv_high = 7.6;
         let ibu_low = 15;
         let ibu_high = 25;
+
         let srm_low = 10.0;
         let srm_high = 17.0;
         let original_gravity_low = 1.062;
