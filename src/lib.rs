@@ -2,6 +2,7 @@ extern crate rusted_cypher;
 
 use std::env;
 use rusted_cypher::GraphClient;
+use rusted_cypher::error::GraphError;
 
 #[derive(Debug)]
 pub struct Style {
@@ -108,17 +109,17 @@ impl PartialEq for Style {
 impl Eq for Style {}
 
 
-pub fn get_graph_connection() -> GraphClient{
+pub fn get_graph_connection() -> Result<GraphClient, GraphError> {
     let neo4j_username = &env::var("NEO4JUSERNAME").unwrap();
     let neo4j_password = &env::var("NEO4JPASSWORD").unwrap();
     let neo4j_server_address = &env::var("NEO4JSERVERADDRESS").unwrap();
     GraphClient::connect(
-        format!("http://{0}:{1}@{2}/db/data", neo4j_username, neo4j_password, neo4j_server_address)).unwrap()
+        format!("http://{0}:{1}@{2}/db/data", neo4j_username, neo4j_password, neo4j_server_address))
 }
 
-pub fn create_beer_style(style: &Style) -> Option<String> {
-    let graph = get_graph_connection();
-    let result = graph.exec(
+pub fn create_beer_style(style: &Style) -> Result<String, GraphError> {
+    let graph = try!(get_graph_connection());
+    try!(graph.exec(
         format!("CREATE (s:Style {{name: '{0}', abvLow: {1}, abvHigh: {2}, ibuLow: {3}, ibuHigh: {4}, srmLow: {5}, srmHigh: {6}, originalGravityLow: {7}, originalGravityHigh: {8}, finalGravityLow: {9}, finalGravityHigh: {10} }}) RETURN s",
                 style.name,
                 style.abv_low,
@@ -130,23 +131,17 @@ pub fn create_beer_style(style: &Style) -> Option<String> {
                 style.original_gravity_low,
                 style.original_gravity_high,
                 style.final_gravity_low,
-                style.final_gravity_high));
+                style.final_gravity_high)));
 
-    match result {
-        Ok(..) => {
-            Some(style.name.clone())
-        }
-        Err(e) => {
-            Some(format!("Error: style could not be created {0}", e))
-        }
-    }
+    Ok(style.name.clone())
 }
 
-pub fn get_beer_style(style_name: &String) -> Style {
-    let graph = get_graph_connection();
-    let result = graph.exec(
+pub fn get_beer_style(style_name: &String) -> Result<Style, GraphError> {
+    let graph = try!(get_graph_connection());
+    let result = try!(graph.exec(
         format!("MATCH (s:Style {{name: '{}' }}) RETURN s.name, s.abvLow, s.abvHigh, s.ibuLow, s.ibuHigh, s.srmLow, s.srmHigh, s.originalGravityLow, s.originalGravityHigh, s.finalGravityLow, s.finalGravityHigh",
-                &*style_name)).unwrap();
+                &*style_name)));
+
     let mut name = String::new();
     let mut abv_low: f64 = 0.0;
     let mut abv_high: f64 = 0.0;
@@ -172,7 +167,7 @@ pub fn get_beer_style(style_name: &String) -> Style {
         final_gravity_high = row.get("s.finalGravityHigh").unwrap();
     }
 
-    Style::new(name,
+    Ok(Style::new(name,
                abv_low,
                abv_high,
                ibu_low,
@@ -182,7 +177,7 @@ pub fn get_beer_style(style_name: &String) -> Style {
                original_gravity_low,
                original_gravity_high,
                final_gravity_low,
-               final_gravity_high)
+               final_gravity_high))
 }
 
 #[cfg(test)]
@@ -205,29 +200,41 @@ mod tests {
         let final_gravity_low = 1.008;
         let final_gravity_high = 1.018;
 
-        let actual = get_beer_style(&name);
-        let expected = Style::new(name, abv_low, abv_high, ibu_low, ibu_high, srm_low, srm_high, original_gravity_low, original_gravity_high, final_gravity_low, final_gravity_high);
+        match get_beer_style(&name) {
+            Ok(actual) => {
+                let expected = Style::new(name, abv_low, abv_high, ibu_low,
+                                          ibu_high, srm_low, srm_high, original_gravity_low,
+                                          original_gravity_high, final_gravity_low, final_gravity_high);
+                assert_eq!(actual, expected)
+            }
+            Err(err) => panic!("Error: something bad happened with get: {0}", err)
+        }
 
-        assert_eq!(actual, expected);
     }
 
     #[test]
     fn create_beer_successful_test() {
-        let name = String::from("International Pale Ale");
+        let name = String::from("International Amber Lager");
         let abv_low = 4.6;
         let abv_high = 6.0;
-        let ibu_low = 18;
+        let ibu_low = 8;
         let ibu_high = 25;
-        let srm_low = 2.0;
-        let srm_high = 6.0;
+        let srm_low = 7.0;
+        let srm_high = 14.0;
         let original_gravity_low = 1.042;
-        let original_gravity_high = 1.050;
+        let original_gravity_high = 1.055;
         let final_gravity_low = 1.008;
-        let final_gravity_high = 1.012;
+        let final_gravity_high = 1.014;
 
         let style = Style::new(name, abv_low, abv_high, ibu_low, ibu_high, srm_low, srm_high, original_gravity_low, original_gravity_high, final_gravity_low, final_gravity_high);
 
-        let actual = create_beer_style(&style);
-        assert_eq!(actual, Some(style.name));
+        match create_beer_style(&style) {
+            Ok(actual) => {
+                let expected = style.name;
+                assert_eq!(actual, expected);
+            }
+            Err(err) => panic!("Error: something bad happened with create: {0}", err)
+        }
+
     }
 }
