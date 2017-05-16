@@ -3,6 +3,7 @@ extern crate rusted_cypher;
 use std::env;
 use rusted_cypher::GraphClient;
 use rusted_cypher::error::GraphError;
+use rusted_cypher::cypher::result::CypherResult;
 
 #[derive(Debug)]
 pub struct Style {
@@ -64,7 +65,6 @@ impl Style {
     fn get_ibu_high(&self) -> &i32 {
         &self.ibu_high
     }
-
 
     fn get_srm_low(&self) -> &f64 {
         &self.srm_low
@@ -141,7 +141,29 @@ pub fn get_beer_style(style_name: &String) -> Result<Style, GraphError> {
     let result = try!(graph.exec(
         format!("MATCH (s:Style {{name: '{}' }}) RETURN s.name, s.abvLow, s.abvHigh, s.ibuLow, s.ibuHigh, s.srmLow, s.srmHigh, s.originalGravityLow, s.originalGravityHigh, s.finalGravityLow, s.finalGravityHigh",
                 &*style_name)));
+    Ok(build_style_from_result(result))
+}
 
+pub fn update_beer_style(style: &Style) -> Result<Style, GraphError> {
+    let graph = try!(get_graph_connection());
+    let result = try!(graph.exec(
+        format!("MERGE (s:Style {{name: '{0}' }}) ON MATCH SET s.abvLow = {1}, s.abvHigh = {2}, s.ibuLow = {3}, s.ibuHigh = {4}, s.srmLow = {5}, s.srmHigh = {6}, s.originalGravityLow = {7}, s.originalGravityHigh = {8}, s.finalGravityLow = {9}, s.finalGravityHigh = {10} RETURN s.name, s.abvLow, s.abvHigh, s.ibuLow, s.ibuHigh, s.srmLow, s.srmHigh, s.originalGravityLow, s.originalGravityHigh, s.finalGravityLow, s.finalGravityHigh",
+                style.name,
+                style.abv_low,
+                style.abv_high,
+                style.ibu_low,
+                style.ibu_high,
+                style.srm_low,
+                style.srm_high,
+                style.original_gravity_low,
+                style.original_gravity_high,
+                style.final_gravity_low,
+                style.final_gravity_high)));
+
+    Ok(build_style_from_result(result))
+}
+
+fn build_style_from_result(result: CypherResult) -> Style {
     let mut name = String::new();
     let mut abv_low: f64 = 0.0;
     let mut abv_high: f64 = 0.0;
@@ -167,7 +189,7 @@ pub fn get_beer_style(style_name: &String) -> Result<Style, GraphError> {
         final_gravity_high = row.get("s.finalGravityHigh").unwrap();
     }
 
-    Ok(Style::new(name,
+    Style::new(name,
                abv_low,
                abv_high,
                ibu_low,
@@ -177,7 +199,7 @@ pub fn get_beer_style(style_name: &String) -> Result<Style, GraphError> {
                original_gravity_low,
                original_gravity_high,
                final_gravity_low,
-               final_gravity_high))
+               final_gravity_high)
 }
 
 #[cfg(test)]
@@ -186,7 +208,7 @@ mod tests {
 
     #[test]
 
-    fn get_beer_successful_test() {
+    fn get_style_successful_test() {
         let name = String::from("Belgian Dubbel");
         let abv_low = 6.0;
         let abv_high = 7.6;
@@ -213,18 +235,18 @@ mod tests {
     }
 
     #[test]
-    fn create_beer_successful_test() {
-        let name = String::from("International Amber Lager");
-        let abv_low = 4.6;
-        let abv_high = 6.0;
-        let ibu_low = 8;
-        let ibu_high = 25;
-        let srm_low = 7.0;
-        let srm_high = 14.0;
-        let original_gravity_low = 1.042;
-        let original_gravity_high = 1.055;
-        let final_gravity_low = 1.008;
-        let final_gravity_high = 1.014;
+    fn create_style_successful_test() {
+        let name = String::from("Czech Amber Lager");
+        let abv_low = 4.4;
+        let abv_high = 5.8;
+        let ibu_low = 20;
+        let ibu_high = 35;
+        let srm_low = 10.0;
+        let srm_high = 16.0;
+        let original_gravity_low = 1.044;
+        let original_gravity_high = 1.060;
+        let final_gravity_low = 1.013;
+        let final_gravity_high = 1.017;
 
         let style = Style::new(name, abv_low, abv_high, ibu_low, ibu_high, srm_low, srm_high, original_gravity_low, original_gravity_high, final_gravity_low, final_gravity_high);
 
@@ -235,6 +257,37 @@ mod tests {
             }
             Err(err) => panic!("Error: something bad happened with create: {0}", err)
         }
+    }
 
+    #[test]
+    fn update_style_successful_test() {
+        let name = String::from("Czech Pale Lager");
+        let original_style = match get_beer_style(&name) {
+            Ok(result) => {
+                result
+            }
+            Err(err) => {
+                panic!("Error: something bad happened when getting the original during the update: {0}", err)
+            }
+        };
+
+        let abv_low = 4.2;
+        let abv_high = 5.8;
+        let ibu_low = 30;
+        let ibu_high = 45;
+        let srm_low = 3.5;
+        let srm_high = 6.0;
+        let original_gravity_low = 1.044;
+        let original_gravity_high = 1.060;
+        let final_gravity_low = 1.013;
+        let final_gravity_high = 1.017;
+        let edited_style = Style::new(name, abv_low, abv_high, ibu_low, ibu_high, srm_low, srm_high, original_gravity_low, original_gravity_high, final_gravity_low, final_gravity_high);
+
+        match update_beer_style(&edited_style) {
+            Ok(updated_style) => {
+                assert_ne!(updated_style, original_style);
+            }
+            Err(err) => panic!("Error: something bad happened with update: {0}", err)
+        }
     }
 }
