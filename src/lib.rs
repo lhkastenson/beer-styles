@@ -163,6 +163,20 @@ pub fn update_beer_style(style: &Style) -> Result<Style, GraphError> {
     Ok(build_style_from_result(result))
 }
 
+pub fn delete_beer_style(name: &String) -> Result<bool, GraphError> {
+    let graph = try!(get_graph_connection());
+    let result = try!(graph.exec(
+        format!("MATCH (s:Style {{name: '{}' }}) DELETE s RETURN count(s)", name)));
+    let mut query_result: bool = false;
+    for row in result.rows() {
+        let count: i32 = row.get("count(s)").unwrap();
+        query_result = count > 0;
+    }
+
+    Ok(query_result)
+
+}
+
 fn build_style_from_result(result: CypherResult) -> Style {
     let mut name = String::new();
     let mut abv_low: f64 = 0.0;
@@ -207,9 +221,8 @@ mod tests {
     use super::*;
 
     #[test]
-
     fn get_style_successful_test() {
-        let name = String::from("Belgian Dubbel");
+        let name = String::from("Test Style For Get");
         let abv_low = 6.0;
         let abv_high = 7.6;
         let ibu_low = 15;
@@ -222,11 +235,18 @@ mod tests {
         let final_gravity_low = 1.008;
         let final_gravity_high = 1.018;
 
-        match get_beer_style(&name) {
+        let style = Style::new(name, abv_low, abv_high, ibu_low,
+                               ibu_high, srm_low, srm_high, original_gravity_low,
+                               original_gravity_high, final_gravity_low, final_gravity_high);
+
+        let _ = create_beer_style(&style);
+
+        match get_beer_style(&style.name) {
             Ok(actual) => {
-                let expected = Style::new(name, abv_low, abv_high, ibu_low,
-                                          ibu_high, srm_low, srm_high, original_gravity_low,
-                                          original_gravity_high, final_gravity_low, final_gravity_high);
+                let expected = style;
+
+                let _ = delete_beer_style(&actual.name);
+
                 assert_eq!(actual, expected)
             }
             Err(err) => panic!("Error: something bad happened with get: {0}", err)
@@ -236,7 +256,7 @@ mod tests {
 
     #[test]
     fn create_style_successful_test() {
-        let name = String::from("Czech Amber Lager");
+        let name = String::from("Test Style For Create");
         let abv_low = 4.4;
         let abv_high = 5.8;
         let ibu_low = 20;
@@ -253,6 +273,9 @@ mod tests {
         match create_beer_style(&style) {
             Ok(actual) => {
                 let expected = style.name;
+
+                let _ = delete_beer_style(&actual);
+
                 assert_eq!(actual, expected);
             }
             Err(err) => panic!("Error: something bad happened with create: {0}", err)
@@ -261,16 +284,25 @@ mod tests {
 
     #[test]
     fn update_style_successful_test() {
-        let name = String::from("Czech Pale Lager");
-        let original_style = match get_beer_style(&name) {
-            Ok(result) => {
-                result
-            }
-            Err(err) => {
-                panic!("Error: something bad happened when getting the original during the update: {0}", err)
-            }
-        };
 
+        let name = String::from("Test Style For Update");
+        let abv_low = 0.0;
+        let abv_high = 0.0;
+        let ibu_low = 0;
+        let ibu_high = 0;
+        let srm_low = 0.0;
+        let srm_high = 0.0;
+        let original_gravity_low = 0.0;
+        let original_gravity_high = 0.0;
+        let final_gravity_low = 0.0;
+        let final_gravity_high = 0.0;
+
+        let original_style = Style::new(name, abv_low, abv_high, ibu_low, ibu_high, srm_low, srm_high, original_gravity_low, original_gravity_high, final_gravity_low, final_gravity_high);
+
+        let _ = create_beer_style(&original_style);
+
+
+        let name = String::from("Test Style For Update");
         let abv_low = 4.2;
         let abv_high = 5.8;
         let ibu_low = 30;
@@ -285,9 +317,48 @@ mod tests {
 
         match update_beer_style(&edited_style) {
             Ok(updated_style) => {
+                let _ = delete_beer_style(&updated_style.name);
                 assert_ne!(updated_style, original_style);
             }
             Err(err) => panic!("Error: something bad happened with update: {0}", err)
+        }
+    }
+
+    #[test]
+    fn delete_style_not_found_successful_test() {
+        let name = String::from("Test Style That Does Not Exist!");
+        match delete_beer_style(&name) {
+            Ok(actual) => {
+                let expected = false;
+                assert_eq!(actual, expected)
+            }
+            Err(err) => panic!("Error: something bad happened with delete: {0}", err)
+        }
+    }
+
+    #[test]
+    fn delete_style_successful_test() {
+        let name = String::from("Test Style That Does Exist");
+        let abv_low = 4.2;
+        let abv_high = 5.8;
+        let ibu_low = 30;
+        let ibu_high = 45;
+        let srm_low = 3.5;
+        let srm_high = 6.0;
+        let original_gravity_low = 1.044;
+        let original_gravity_high = 1.060;
+        let final_gravity_low = 1.013;
+        let final_gravity_high = 1.017;
+        let style = Style::new(name, abv_low, abv_high, ibu_low, ibu_high, srm_low, srm_high, original_gravity_low, original_gravity_high, final_gravity_low, final_gravity_high);
+
+        let _ = create_beer_style(&style);
+
+        match delete_beer_style(&style.name) {
+            Ok(actual) => {
+                let expected = true;
+                assert_eq!(actual, expected)
+            }
+            Err(err) => panic!("Error: something bad happened with delete: {0}", err)
         }
     }
 }
